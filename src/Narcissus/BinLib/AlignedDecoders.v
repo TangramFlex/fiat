@@ -91,6 +91,9 @@ Section AlignedDecoders.
 
   Variable addE_addE_plus :
     forall (ce : CacheFormat) (n m : nat), addE (addE ce n) m = addE ce (n + m).
+  Variable addD_addD_plus :
+    forall (ce : CacheDecode) (n m : nat), addD (addD ce n) m = addD ce (n + m).
+
   Variable addE_0 : forall ce, addE ce 0 = ce.
   Variable addD_0 : forall cd, addD cd 0 = cd.
 
@@ -436,6 +439,60 @@ Section AlignedDecoders.
     eapply refine_CorrectAlignedEncoder.
     2: eapply CorrectAlignedEncoderForFormatChar_f; eauto.
     unfold format_enum; intros; split.
+    - intros ? ?.
+      unfold FMapFormat.Projection_Format, FMapFormat.Compose_Format in H.
+      rewrite unfold_computes in H.
+      destruct_ex; intuition; subst; eauto.
+    - intros; intro.
+      eapply H.
+      unfold FMapFormat.Projection_Format, FMapFormat.Compose_Format.
+      rewrite unfold_computes.
+      eexists _; intuition; subst; eauto.
+  Qed.
+
+  Lemma CorrectAlignedEncoderForFormatEnumString
+        {len}
+        term_char (codes : t string (S len))
+    : CorrectAlignedEncoderFor (format_enum_string codes term_char).
+  Proof with auto.
+    eexists.
+    unfold format_enum_string.
+    eapply refine_CorrectAlignedEncoder with (format' := FMapFormat.Projection_Format format_string  (fun s => (Vector.nth codes s) ++ String term_char "")%string).
+    - split; intros.
+      + unfold format_string_with_term_char, FMapFormat.Projection_Format, FMapFormat.Compose_Format.
+        intros [? ?] ?.
+        rewrite unfold_computes in H; destruct H; intuition; subst; eauto.
+      + intros.
+        intros ?; eapply H.
+        unfold format_string_with_term_char in H0;
+          unfold FMapFormat.Projection_Format, FMapFormat.Compose_Format.
+        apply unfold_computes; eexists _; eauto.
+    - eapply CorrectAlignedEncoderProjection.
+      eapply CorrectAlignedEncoderForFormatString...
+  Defined.
+
+  Definition AlignedEncoderFormatEnumString
+             {len}
+             term_char
+             (codes: t string (S len))
+    :=
+      Eval simpl in projT1 (CorrectAlignedEncoderForFormatEnumString term_char codes).
+
+  Lemma CorrectAlignedEncoderFormatEnumString
+        {len}
+        (codes : t string (S len))
+        (term_char : Ascii.ascii)
+    : CorrectAlignedEncoder
+        (format_enum_string codes term_char(monoidUnit := ByteString_QueueMonoidOpt))
+        (AlignedEncoderFormatEnumString term_char codes).
+  Proof.
+    eapply refine_CorrectAlignedEncoder.
+    2:{
+      unfold AlignedEncoderFormatEnumString.
+      eapply CorrectAlignedEncoderProjection; eauto.
+      eapply CorrectAlignedEncoderForFormatString; auto.
+    }
+    unfold format_enum_string; intros; split.
     - intros ? ?.
       unfold FMapFormat.Projection_Format, FMapFormat.Compose_Format in H.
       rewrite unfold_computes in H.
