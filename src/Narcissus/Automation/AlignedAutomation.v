@@ -651,6 +651,7 @@ Ltac align_encoder_step :=
   | apply CorrectAlignedEncoderForFormatChar; eauto
   | apply CorrectAlignedEncoderForFormatNat
   | apply CorrectAlignedEncoderForFormat2Nat; eauto
+  | apply CorrectAlignedEncoderFormatEnumString; auto
   | apply CorrectAlignedEncoderForFormatEnum
   | eapply CorrectAlignedEncoderForFormatByteBuffer; eauto using encoder_empty_cache_OK
   | eapply CorrectAlignedEncoderProjection
