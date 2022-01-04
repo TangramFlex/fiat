@@ -92,13 +92,31 @@ Proof.
   right; simpl; auto.
 Qed.
 
+Ltac solve_term_char_not_in_sub :=
+  match goal with
+  | [H : In _ (list_ascii_of_string _) |- _ ] =>
+    simpl in H; solve_term_char_not_in_sub
+  | [H : _ = _ |- _ ] =>
+    inversion H; solve_term_char_not_in_sub
+  | [ H : _ \/ _ |- _ ] =>
+    destruct H; solve_term_char_not_in_sub
+  | [ H : False |- _ ]  => exact H
+  | |- _ => fail
+  end.
+
 Ltac solve_term_char_not_in :=
-  simpl; 
-  apply forall_Vector_P;
-  repeat constructor;
-  (intros s1 s2 Hnot;
-   apply string_eq_In_list in Hnot;
-   destruct Hnot as [Hnot | Hnot']; [|destruct Hnot']; auto; discriminate).
+  repeat
+    match goal with
+    | |- context[Vector.nth _ _ <> _] =>
+      intros; simpl; apply forall_Vector_P
+    | |- context[Vector.Forall _] =>
+      constructor
+    | |- context[_ <> _] =>
+      intros; intros Hnot;
+        apply string_eq_In_list in Hnot;
+        clear -Hnot;
+        solve solve_term_char_not_in_sub
+    end.
 
 Ltac solve_side_condition :=
   (* Try to discharge a side condition of one of the base rules *)
