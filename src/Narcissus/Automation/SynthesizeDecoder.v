@@ -156,8 +156,15 @@ Ltac apply_base_rule :=
 
   (* Strings *)
   | H : cache_inv_Property _ _
-  |- context[CorrectDecoder _ _ _ _ StringOpt.format_string _ _ _ ] =>
-    eapply StringOpt.String_decode_correct
+    |- context[CorrectDecoder _ _ _ _ format_string _ _ _ ] =>
+    intros; 
+    eapply StringOpt.String_decode_correct; eauto
+
+  (* Terminated Strings *)                                              
+  | H : cache_inv_Property _ _
+    |- context[CorrectDecoder _ _ _ _ (format_string_with_term_char _) _ _ ] =>
+    intros; 
+    eapply String_decode_with_term_char_correct; eauto
 
   (* Enumerated Types *)
   | H : cache_inv_Property _ _

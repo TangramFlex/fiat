@@ -650,6 +650,8 @@ Ltac align_encoder_step :=
     eauto using encoder_empty_cache_OK
   | apply CorrectAlignedEncoderForFormatChar; eauto
   | apply CorrectAlignedEncoderForFormatNat
+  | apply CorrectAlignedEncoderForFormatString; eauto
+  | apply CorrectAlignedEncoderFormatStringTerm; auto
   | apply CorrectAlignedEncoderForFormat2Nat; eauto
   | apply CorrectAlignedEncoderFormatEnumString; auto
   | apply CorrectAlignedEncoderForFormatEnum
