@@ -1367,9 +1367,6 @@ Section AlignedDecoders.
     simpl; reflexivity.
   Qed.
 
-  Variable addD_addD_plus :
-    forall cd n m, addD (addD cd n) m = addD cd (n + m).
-
   Lemma AlignedDecodeUnusedChars {C}
         {numBytes numBytes'}
     : forall (v : ByteBuffer.t (numBytes' + numBytes))
