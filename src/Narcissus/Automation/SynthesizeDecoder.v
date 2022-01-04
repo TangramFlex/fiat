@@ -33,7 +33,7 @@ Require Import
         Fiat.Narcissus.Automation.Decision
         Fiat.Narcissus.Automation.Common
         Fiat.Narcissus.Automation.ExtractData.
-
+From Coq Require Import String.
 
 Ltac shelve_inv :=
   let H' := fresh in
@@ -67,6 +67,39 @@ Ltac solve_data_inv :=
     solve [intuition eauto 3 with data_inv_hints]
     | shelve_inv ].
 
+Lemma list_ascii_of_string_app : forall s1 s2,
+    (list_ascii_of_string (s1 ++ s2))%string =
+    ((list_ascii_of_string s1) ++ (list_ascii_of_string s2))%list.
+Proof.
+  intros.
+  induction s1; auto.
+  intros.
+  simpl.
+  f_equal.
+  rewrite IHs1; auto.
+Qed.
+
+Lemma string_eq_In_list :
+  forall s s1 s2 a,
+    s = (s1 ++ String a s2)%string ->
+    In a (list_ascii_of_string s).
+Proof.
+  intros.
+  rewrite H.
+  clear H.
+  rewrite list_ascii_of_string_app.
+  apply in_or_app.               
+  right; simpl; auto.
+Qed.
+
+Ltac solve_term_char_not_in :=
+  simpl; 
+  apply forall_Vector_P;
+  repeat constructor;
+  (intros s1 s2 Hnot;
+   apply string_eq_In_list in Hnot;
+   destruct Hnot as [Hnot | Hnot']; [|destruct Hnot']; auto; discriminate).
+
 Ltac solve_side_condition :=
   (* Try to discharge a side condition of one of the base rules *)
   match goal with
@@ -75,6 +108,8 @@ Ltac solve_side_condition :=
     let a'' := fresh in
     intro a''; intros; repeat instantiate (1 := fun _ _ => True);
     repeat destruct a'' as [ ? | a''] ; auto
+  | |- context[Vector.nth _ _ <> _] =>
+    try intros; simpl; solve_term_char_not_in
   | _ => solve [solve_data_inv]
   | _ => solve [intros; instantiate (1 := fun _ _ => True); exact I]
   end.
@@ -117,7 +152,8 @@ Ltac apply_base_rule :=
   | H : cache_inv_Property _ _
     |- context [CorrectDecoder _ _ _ _ (format_enum_string ?tb ?term_char) _ _ _] =>
     intros;
-    eapply (fun NoDup => Enum_decode_string_correct _ NoDup _ _)
+    eapply (fun NoDup => Enum_decode_string_correct _ NoDup _ _);
+    solve_side_condition
 
   (* Unused words *)
   | |- context [CorrectDecoder _  _ _ _ (format_unused_word _) _ _ _] =>
