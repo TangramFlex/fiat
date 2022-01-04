@@ -113,6 +113,12 @@ Ltac apply_base_rule :=
     eapply (fun NoDup => @Enum_decode_correct _ _ _ _ _ _ _ tb NoDup _ H);
     solve_side_condition
 
+  (* Enumerated Types as Strings *)
+  | H : cache_inv_Property _ _
+    |- context [CorrectDecoder _ _ _ _ (format_enum_string ?tb ?term_char) _ _ _] =>
+    intros;
+    eapply (fun NoDup => Enum_decode_string_correct _ NoDup _ _)
+
   (* Unused words *)
   | |- context [CorrectDecoder _  _ _ _ (format_unused_word _) _ _ _] =>
     intros; eapply unused_word_decode_correct; eauto
