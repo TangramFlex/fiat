@@ -10,7 +10,8 @@ Require Import
         Fiat.Narcissus.Formats.StringOpt
         Fiat.Narcissus.BaseFormats
         Fiat.Narcissus.Automation.Solver
-        Fiat.Narcissus.Automation.NormalizeFormats.
+        Fiat.Narcissus.Automation.NormalizeFormats
+        Fiat.Narcissus.BinLib.AlignedString.
 
 Require Import Bedrock.Word.
 
@@ -630,6 +631,7 @@ Qed.
 
 (* Redefine this tactic to implement new encoder rules *)
 Ltac new_encoder_rules := fail.
+
 
 Ltac align_encoder_step :=
   first
