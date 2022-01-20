@@ -75,20 +75,19 @@ Section String.
   Theorem string_decode_with_term_correct
           {P : CacheDecode -> Prop}
           (close : string)
-    : cache_inv_Property P
-    (fun P0 : CacheDecode -> Prop =>
-       forall (b : nat) (cd : CacheDecode), P0 cd -> P0 (addD cd b)) -> 
+          (cache_inv : cache_inv_Property P
+                        (fun P0 : CacheDecode -> Prop =>
+                          forall (b : nat) (cd : CacheDecode), P0 cd -> P0 (addD cd b))) :
     CorrectDecoder monoid
                    (* This needs to be updated *)                                   
-                   (fun s => close <> "")%string
-                   (fun s => close <> "")%string
+                   (fun s => forall s1 s2, s <> s1 ++ close ++ s2)%string
+                   (fun s => forall s1 s2, s <> s1 ++ close ++ s2)%string
                    eq
                    (format_with_term format_string close)
                    (decode_string_with_term close)
                    P
                    (format_with_term format_string close).
   Proof.
-    intros cach_inv.
     split.
     { intros env env' xenv s s' ext ? Eeq Ppred Penc.
       generalize dependent env.
@@ -161,6 +160,21 @@ Section String.
         }
       }
       {
+        intros.
+        unfold format_with_term in Penc;
+          unfold decode_string_with_term.
+        simpl in *.
+        assert (IHpred : forall s1 s2 : string, s <> (s1 ++ close ++ s2)%string).
+        {
+          clear -Ppred.
+          intros.
+          specialize (Ppred (String a s1) s2).
+          intros Hnot.
+          subst.
+          simpl in *.
+          auto.
+        }
+        specialize (IHs IHpred).
         admit.
       }
     }
