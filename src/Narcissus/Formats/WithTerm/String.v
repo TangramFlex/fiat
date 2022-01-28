@@ -34,42 +34,49 @@ Section String.
         Some (String a xs, b2, e2)))) b cd).
 
 
-  Instance Equivalence_ S T : Equivalence (EquivFormat (S := S) (T := T)).
+  Lemma format_string_cons : 
+    forall (a : Ascii.ascii) (s : string) (s' : B) (env xenv : CacheFormat)
+           (close : string),
+      (format_string ++ format_string ◦ constant close) (String a s) env
+         ∋ (s', xenv) ->
+         exists s'' xenv' env' b,
+           (format_string ++ format_string ◦ constant close) s env' ∋ (s'', xenv') /\
+           mappend b s'' = s'.
   Proof.
-    constructor; 
-    red; 
-    [ apply EquivFormat_reflexive |
-      apply EquivFormat_sym |
-      apply EquivFormat_trans
-    ].
-  Qed.
-
-  Instance Symmetric_ S T : Symmetric (EquivFormat (S := S) (T := T)).
-  Proof.
-    red; auto.
     intros.
-    symmetry.
-    auto.
-  Qed.
-
-  Add Parametric Morphism S T store M vP vP' decode P
-    : (fun format => CorrectDecoder (S := S)
-                    (T := T) (store := store) M vP vP' eq format decode P format) with
-        signature (@EquivFormat S T store) ==>
-                                           iff as cd_morph.
-  Proof using Type.
-    intros.
-    pose proof format_decode_correct_EquivFormatAndView_Proper.
-    do 2 red in H0.
-    simpl in H0.
-    unfold impl in H0.
-    split.
-    intros.
-    unfold flip in H0.
-    apply EquivFormat_sym in H.
-    eapply H0 in H; eauto.
-    intros.
-    eapply H0 in H; eauto.
+    apply Bind_inv in H;
+      destruct_ex;
+      split_and.
+    repeat match goal with
+        | H : ComposeOpt.compose _ _ _ _ ∋ _ |- _ =>
+          apply Bind_inv in H;
+            destruct_ex;
+            split_and
+        | H : Bind2 _ _ ∋ _ |- _ =>
+          apply Bind_inv in H;
+            destruct_ex;
+            split_and
+        end.
+        apply Return_inv in H2,H4.
+        inversion H4; subst.
+        clear H.
+        simpl in H2.
+        inversion H2.
+        subst.
+        clear H2.
+        exists (mappend (fst x2) (fst x0)).
+        exists (snd x0).
+        exists (snd x1).
+        eexists (fst x1).
+        split; eauto.
+        econstructor.
+        split; red; simpl; eauto.
+        exact H3.
+        simpl in *.
+        apply unfold_computes.
+        eapply BindComputes; eauto.
+        rewrite mappend_assoc.
+        auto.
   Qed.
 
   Theorem string_decode_with_term_correct
@@ -79,7 +86,6 @@ Section String.
                         (fun P0 : CacheDecode -> Prop =>
                           forall (b : nat) (cd : CacheDecode), P0 cd -> P0 (addD cd b))) :
     CorrectDecoder monoid
-                   (* This needs to be updated *)                                   
                    (fun s => forall s1 s2, s <> s1 ++ close ++ s2)%string
                    (fun s => forall s1 s2, s <> s1 ++ close ++ s2)%string
                    eq
@@ -96,7 +102,6 @@ Section String.
       { unfold id in *; intros.
         unfold format_with_term in Penc.
         unfold "++" in Penc.
-        unfold compose in Penc.
         simpl in Penc.
         unfold Bind2 in Penc.
         apply Bind_inv in Penc.
@@ -163,6 +168,12 @@ Section String.
         intros.
         unfold format_with_term in Penc;
           unfold decode_string_with_term.
+        pose proof Penc as PencInd.
+        apply format_string_cons in PencInd.
+        destruct PencInd.
+        destruct_ex; split_and.
+        subst.
+        rename H0 into IHPenc.
         simpl in *.
         assert (IHpred : forall s1 s2 : string, s <> (s1 ++ close ++ s2)%string).
         {
@@ -175,11 +186,65 @@ Section String.
           auto.
         }
         specialize (IHs IHpred).
-        admit.
-      }
-    }
-    {
-      admit.
-    }
+        clear IHpred.
+        eapply IHs in IHPenc; eauto.
+        destruct_ex; split_and.
+        (* subst. *)
+        {
+          unfold "++" in Penc.
+          apply Bind_inv in Penc;
+            destruct_ex;
+            split_and.
+          unfold format_with_term in IHs.
+          repeat match goal with
+                 | H : ComposeOpt.compose _ _ _ _ ∋ _ |- _ =>
+                   apply Bind_inv in H;
+                     destruct_ex;
+                     split_and
+                 | H : Bind2 _ _ ∋ _ |- _ =>
+                   apply Bind_inv in H;
+                     destruct_ex;
+                     split_and
+                 end.
+          apply Return_inv in H7,H9.
+          (* inversion H8; subst. *)
+          (* clear H. *)
+          (* simpl in H7. *)
+          simpl in *.
+          unfold format_with_term in H1.
+          pose proof (String_decode_correct (P := P)) as Hs.
+          destruct Hs with (sz := String.length close); eauto.
+          clear H10 Hs.
+          destruct x6.
+          simpl in *.
+          inversion H6; subst.
+          destruct H10.
+          subst.
+          simpl in *.
+          inversion H7; subst.
+          simpl in *.
+          (* exists (String a x3). *)
+          rewrite Init.Wf.Fix_eq.
+          eexists; eauto.
+          eexists; eauto.
+          {
+          
+            apply EquivFormat_Projection_Format in H6.
+            eapply (@H3 _ _ _ _ _ ext) in H6; eauto.
+            clear H3.
+            destruct_ex; split_and.
+            clear IHs.
+            inversion H7; subst.
+            unfold decode_string_with_term in H0.
+            (* Really close here just need to know that decode_string 
+               returns some on bigger args if it did for smaller ones 
+               and that the string it results in is not the same 
+               and that it is not equal to close using H6
+             *)
+            (* Then we can hopefully use the decode_ascii in scope and 
+               the result of our induction hypothesis to prove the rec bind 
+               is some of something 
+             *)
+            (* Haven't thought about the other conjuncts. *)
   Admitted.
 End String.
