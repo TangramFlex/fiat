@@ -56,7 +56,6 @@ Section String.
     unfold DecodeBindOpt;
     unfold Bind2;
     unfold BindOpt).
-
       
   Lemma format_string_env_eq : forall s env env' b,
       (format_string s env) ∋ (b, env') ->
@@ -290,34 +289,6 @@ Section String.
         (* exists (String a s). *)
         unfold decode_string_with_term.
         rewrite Init.Wf.Fix_eq.
-        (* assert (Deq : *)
-        (*     (`(a0, b1, e1) <- Decode_w_Measure_lt decode_ascii  *)
-        (*                       (mappend s' ext) env' ascii_decode_lt; *)
-        (*    `(xs, b2, e2) <- Fix well_founded_lt_b *)
-        (*                       (constant (CacheDecode -> *)
-        (*                                  option (string * B * CacheDecode))) *)
-        (*                       (fun (b : B) *)
-        (*                          (rec : forall y : B, *)
-        (*                                 lt_B y b -> *)
-        (*                                 CacheDecode -> *)
-        (*                                 option (string * B * CacheDecode)) *)
-        (*                          (cd : CacheDecode) => *)
-        (*                        `(term_code0, b'0, cd'0) <-  *)
-        (*                        decode_string (String.length close) b cd; *)
-        (*                        If (close =? term_code0)%string *)
-        (*                        Then Some (""%string, b'0, cd'0) *)
-        (*                        Else (`(a1, b0, e0) <- Decode_w_Measure_lt decode_ascii *)
-        (*                                                 b cd ascii_decode_lt; *)
-        (*                              `(xs, b2, e2) <- rec (` b0) (proj2_sig b0) e0; *)
-        (*                              Some (String a1 xs, b2, e2))) *)
-        (*                       (` b1) e1; *)
-        (*                        Some (String a0 xs, b2, e2)) *)
-        (*     =  *)
-        (*    (`(a0, b1, e1) <- Decode_w_Measure_lt decode_ascii  *)
-        (*                                          (mappend s' ext) env' ascii_decode_lt; *)
-        (*     `(xs, b2, e2) <- decode_string_with_term close (` b1) e1; *)
-        (*    Some (String a0 xs, b2, e2)) *)
-        (*   ) by auto. *)
         assert (Deq :
             (`(a0, b1, e1) <- Decode_w_Measure_lt decode_ascii 
                               (mappend s' ext) env' ascii_decode_lt;
@@ -446,6 +417,8 @@ Section String.
         {
           destruct p,p.
           simpl.
+          inversion Penc'0'.
+          subst.
           destruct String.eqb eqn:?.
           simpl.
           {
@@ -484,7 +457,7 @@ Section String.
               destruct_ex.
               split_and.
               rewrite mappend_assoc.
-              rewrite H7; eauto.
+              rewrite H5; eauto.
               simpl; eauto.
               eexists.
               eexists.
