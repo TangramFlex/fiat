@@ -222,6 +222,123 @@ Section String.
     }
   Qed.
 
+  
+  Open Scope string.
+  Definition invariants (close : string) :=
+    fun s => forall s1 s2, s2 <> ""%string -> s ++ close <> s1 ++ close ++ s2.
+
+  Lemma string_app_rid : forall s s', 
+      s = (s ++ s') -> s' = "".
+  Proof.
+    induction s; auto.
+    intros.
+    simpl in H.
+    inversion H.
+    apply IHs in H1; auto.
+  Qed.
+
+  From Coq Require Import String.
+  Lemma  string_app_empty : forall s1 s2,
+      "" = s1 ++ s2 ->
+      s1 = "" /\ s2 = "".
+  Proof.
+    destruct s1; auto; discriminate.
+  Qed.
+
+  Lemma string_app_assoc:
+  forall (l m n : string), (l ++ m ++ n)= ((l ++ m) ++ n).
+  Proof.
+    induction l; auto.
+    intros.
+    simpl in *.
+    rewrite IHl; auto.
+  Qed.
+
+  Lemma string_length_0 : forall s,
+      length s = 0 -> s = "".
+  Proof.
+    destruct s; intros; auto; discriminate.
+  Qed.
+
+  Lemma string_app_id : forall s s1 s2, 
+      s = (s1 ++ s ++ s2) ->
+      s1 = "" /\ s2 = "".
+  Proof.
+    induction s; eauto using string_app_empty.
+    intros.
+    simpl in *.
+    destruct s1; auto.
+    {
+      simpl in *.
+      replace (String a (s ++ s2)) with ((String a s) ++ s2) in H by auto.
+      split; 
+        eauto using string_app_rid.
+    }
+    simpl in *.
+    inversion H.
+    subst.
+    specialize (IHs (s1 ++ (String a0 EmptyString)) s2).
+    replace (String a0 (s ++ s2)) with ((String a0 s) ++ s2) in H2 by auto.
+    replace ((s1 ++ String a0 "") ++ s ++ s2) with
+        (s1 ++ String a0 s ++ s2) in IHs.
+    2:{
+      replace ((s1 ++ String a0 "") ++ s ++ s2) with
+          (s1 ++ String a0 "" ++ s ++ s2) by (auto using string_app_assoc).
+      auto.
+    }
+    apply IHs in H2.
+    intuition.
+    subst; auto.
+    exfalso.
+    symmetry in H0.
+    apply string_app_empty in H0.
+    intuition; discriminate.
+  Qed.
+  Close Scope string.
+
+  Declare Scope Monoid.
+  Notation "x ++ y" := (sequence_Format x y) : Monoid.
+  Open Scope Monoid.
+  Section  new.
+    Variable A C : Type.
+    Variable format_A : A -> CacheFormat -> Comp (B * CacheFormat).
+    Variable A_cache_inv : CacheDecode -> Prop.
+    Variable A_cache_OK : cache_inv_Property A_cache_inv
+                                           (fun P => forall b cd, P cd -> P (addD cd b)).
+
+
+    Variable format_close : C -> CacheFormat -> Comp (B * CacheFormat).
+    Variable close : C.
+
+    Definition format_with_term' (close : C) : FormatM A B :=
+      format_A ++ format_close ◦ (constant close).
+  End new.
+
+  (* Definition invariant (close : A) : Prop := *)
+  (*   fun s => *)
+  (*     forall cf cf' bs, *)
+  (*       format_string s cf ∋ (bs, cf'). *)
+        
+                            
+(*   format_string s ~> bs -> *)
+(* close ~> bc -> *)
+(* close ~> bc' -> *)
+(* forall ext bs1 bs2 b2, bs = bs1 ++ bs2 -> bs2 <> empty -> bs2 ++ bc ++ ext <> bc' ++ b2   *)
+
+  (* Definition format_with_term (close : string) : FormatM A T := *)
+  (*   format_A ++ format_string ◦ (constant close). *)
+  Close Scope Monoid.
+
+  Definition invariant (close : string) : string -> Prop :=
+    fun s =>
+      forall cd bs cd' cdclose cdclose' bclose bclose1 cdclose1', 
+        computes_to (format_string s cd) (bs, cd') ->
+        computes_to (format_string close cdclose) (bclose, cdclose') ->
+        computes_to (format_string close cdclose) (bclose1, cdclose1') ->
+        forall ext bs1 bs2 b2, bs = mappend bs1 bs2 ->
+                        bs2 <> mempty ->
+                        mappend bs2 (mappend bclose ext) <> mappend bclose1 b2.
+  
   Theorem string_decode_with_term_correct
           {P : CacheDecode -> Prop}
           (close : string)
@@ -229,8 +346,8 @@ Section String.
                         (fun P0 : CacheDecode -> Prop =>
                           forall (b : nat) (cd : CacheDecode), P0 cd -> P0 (addD cd b))) :
     CorrectDecoder monoid
-                   (fun s => (forall s1 s2, s <> s1 ++ close ++ s2))%string
-                   (fun s => (forall s1 s2, s <> s1 ++ close ++ s2))%string
+                   (invariants close)
+                   (invariants close)
                    eq
                    (format_with_term format_string close)
                    (decode_string_with_term close)
@@ -325,13 +442,21 @@ Section String.
           ) by auto.
         rewrite Deq.
         clear Deq.
-        assert (IHpred : (forall s1 s2 : string, s <> s1 ++ close ++ s2)%string).
+        assert (IHpred : invariants close s).
         {
+          red.
           clear -Ppred.
+          unfold invariants in *.
           intros.
-          specialize (Ppred (String a s1) s2).
           intros Hnot.
-          subst; eauto.
+          specialize (Ppred (String a s1) s2).
+          apply Ppred; eauto.
+          assert (String a s = String a EmptyString ++ s)%string.
+          eauto.
+          rewrite H0.
+          rewrite <- string_app_assoc.
+          rewrite Hnot.
+          eauto.
         }
         specialize (IHs IHpred).
         clear IHpred.
@@ -549,7 +674,78 @@ Section String.
           {
             intuition; subst; simpl; auto.
             rewrite mempty_left; auto.
-            admit.
+            {
+              red.
+              intros.
+              apply eqb_eq in Heqc.
+              rewrite <- Heqc in *.
+              clear H6.
+              clear H5.
+              clear H.
+              clear H2.
+              clear Heqc.
+              generalize dependent s1.
+              generalize dependent s2.
+              generalize dependent x0.
+              generalize dependent t'.
+              induction close.
+              intuition; eauto.
+              simpl in *.
+              {
+                clear -H4 H.
+                destruct s1; auto; try discriminate.
+              }
+              {
+                intros.
+                simpl in *.
+                unf Hclose.
+                destruct decode_ascii eqn:Ha; try discriminate.
+                destruct_conjs.
+                destruct decode_string eqn:Hs; try discriminate.
+                destruct_conjs.
+                simpl in *.
+                inversion Hclose.
+                rewrite <- H5 in *.
+                clear H5.
+                subst.
+                intros Hnot.
+                replace (s1 ++ String a (s0 ++ s2))%string with
+                    (s1 ++ (String a s0) ++ s2)%string in Hnot by auto.
+                assert (s2 = ""%string).
+                {
+                  clear -Hnot H4.
+                  
+                  generalize dependent s0.
+                  generalize dependent s1.
+                  generalize dependent a.
+                  induction s1; auto.
+                  {
+                    intros.
+                    simpl in *.
+                    destruct s2; auto.
+                    simpl in *.
+                    inversion Hnot.
+                    apply string_app_rid in H0.
+                    inversion H0.
+                  }
+                  {
+                    intros.
+                    simpl in *.
+                    inversion Hnot; eauto using string_app_rid.
+                    subst.
+                    replace (s0 = (s1 ++ String a0 (s0 ++ s2))%string) with
+                        (s0 = ((s1 ++ (String a0 EmptyString)) ++ s0 ++ s2)%string) in H1.
+                    2:{
+                      rewrite <- string_app_assoc.
+                      auto.
+                    }
+                    apply string_app_id in H1.
+                    intuition; try discriminate.
+                  }
+                }
+                eauto.
+              }
+            }
           }
         }
         {
@@ -585,7 +781,133 @@ Section String.
               do 2 rewrite mappend_assoc; auto.
             }
             {
-              admit.
+              clear H.
+              clear -Hc H6 H9 H9' H11 H9'' Heqc H4.
+              red in H11.
+              red.
+              intros.
+              intros Hnot.
+              assert (exists x1, x5 = x1 ++ close)%string.
+              2:{
+                destruct H0.
+                subst.
+                apply (H11 x close).
+                2:{
+                  auto using string_app_assoc.
+                }
+                intros Hnot'; subst; simpl in *.
+                inversion Hc; subst; discriminate.
+              }
+              destruct (decode_ascii (mappend x1 b0) env') as [ [ [? ?] ?] | ] eqn: ? .
+              2:{
+                exfalso.
+                eapply Decode_w_Measure_lt_eq' in Heqo; eauto.
+                rewrite H4 in Heqo.
+                discriminate.
+              }
+              clear H4.
+              assert (length close = 0 \/ length close <> 0).
+              {
+                destruct close; simpl; auto.
+              }
+              destruct H0.
+              {
+                rewrite H0 in Hc.
+                exfalso.
+                simpl in Hc.
+                inversion Hc.
+                subst.
+                simpl in *.
+                apply string_length_0 in H0.
+                subst; eauto.
+                apply eqb_neq in Heqc; contradiction.
+              }
+              {
+                admit.
+                
+                (* intros Hnot. *)
+                (* simpl in *. *)
+                (* pose proof Hc as Hs. *)
+                (* apply decode_string_ascii with (env' := env') in Hs; eauto. *)
+                (* destruct_ex. *)
+                (* simpl in *. *)
+                (* destruct s; auto. *)
+                (* { *)
+                (*   simpl in *. *)
+                (*   rewrite Heqo in H1; discriminate. *)
+                (* } *)
+                (* { *)
+                (*   simpl in H1.                 *)
+                (*   assert (a = a0). *)
+                (*   { *)
+                (*     rewrite H1 in Heqo. *)
+                (*     inversion Heqo. *)
+                (*     subst; auto. *)
+                (*   } *)
+                (*   rewrite <- H2 in *. *)
+                (*   clear H2 Heqo. *)
+                (*   assert (x0 = a). *)
+                (*   { *)
+                (*     (* eapply Ascii_decode_correct in H6; eauto. *) *)
+                (*     (* - *) *)
+                (*     (*   destruct H6. *) *)
+                (*     (*   destruct_ex. *) *)
+                (*     (*   split_and; auto. *) *)
+                (*     (*   subst; auto. *) *)
+                (*     (*   rewrite H3 in Heqo. *) *)
+                (*     (*   inversion Heqo; subst; auto. *) *)
+                (*     (* - *) *)
+                (*     (*   clear H2. *) *)
+                (*     admit. *)
+                (*   } *)
+                (*   subst. *)
+                (*   assert (exists x1, x5 = x1 ++ close)%string. *)
+                (*   clear -Hnot H0 H. *)
+                (*   { *)
+                (*     generalize dependent s1. *)
+                (*     generalize dependent s2. *)
+                (*     generalize dependent close. *)
+                (*     induction x5; eauto. *)
+                (*     intros. *)
+                (*     simpl in *. *)
+                (*     exfalso. *)
+                (*     { *)
+                (*       destruct s1. *)
+                (*       { *)
+                (*         simpl in *. *)
+                (*         generalize dependent s2. *)
+                (*         induction close. *)
+                (*         simpl in *. *)
+                (*         eauto. *)
+                (*         simpl in *. *)
+                (*         intros. *)
+                (*         inversion Hnot. *)
+                (*         subst;  *)
+                (*         simpl in *. *)
+                (*         destruct close. *)
+                (*         simpl in *. *)
+                        
+                        
+                        
+                (*         apply string_app_id in H3. *)
+                (*       intuition. *)
+                (*     } *)
+                (*     simpl in *. *)
+                (*     destruct s2; eauto. *)
+                (*     exfalso; eauto. *)
+                (*     clear H0. *)
+                (*     simpl in *. *)
+                    
+
+                (*     exfalso; eauto. *)
+                (*     apply H0. *)
+                    
+                    
+                    
+                    
+
+
+              }
             }
             {
               destruct_conjs; simpl in *;
@@ -648,4 +970,51 @@ Section String.
         destruct_conjs;
         match goal with| H : context[_ _ _ = _ _ _] |- _ => rewrite H end; auto.
     }
-    Admitted.
+  Admitted.
+   Open Scope nat_scope.
+  Definition find_split (term: string) : 
+    B -> CacheDecode -> option (nat * B * CacheDecode) := 
+    Fix well_founded_lt_b
+        (fun _ => CacheDecode -> option (nat * B * CacheDecode))
+        (fun b rec cd =>
+           match decode_string (String.length term) b cd with
+           | None => 
+             (`(_, b1, e1) <- Decode_w_Measure_lt decode_ascii b cd ltac:(exact ascii_decode_lt);
+             (`(idx, b2, e2) <- rec _ (proj2_sig b1) e1;
+             Some (S idx, b2, e2)))
+           | Some((term_code, b', cd')) =>
+             If String.eqb term term_code Then
+                Some (O, b', cd')
+             Else
+                (`(a, b1, e1) <- Decode_w_Measure_lt decode_ascii b cd
+                                                     ltac:(exact ascii_decode_lt);
+                (`(idx, b2, e2) <- rec _ (proj2_sig b1) e1;
+                Some (S idx, b2, e2)))
+           end).
+
+  Definition decode_string_with_term_oracle (code: string) : 
+    B -> CacheDecode -> option (string * B * CacheDecode) := 
+    fun b cd => 
+      `(non_term_length,b',cd') <- find_split code b cd;
+      `(s, _, _) <- decode_string non_term_length b cd;
+      `(_, b'', cd'') <- decode_string (length code) b' cd';
+       Some (s, b'', cd'').
+  Lemma decode_string_eq_oracle : forall term b cd,
+      decode_string_with_term term b cd = decode_string_with_term_oracle term b cd.
+  Proof.
+    intros.
+    unfold decode_string_with_term.
+    unfold decode_string_with_term_oracle.
+    unfold find_split.
+    eapply (@well_founded_induction _ _ well_founded_lt_b) with
+        (a := b); intros.
+    rewrite Coq.Init.Wf.Fix_eq.
+    rewrite Coq.Init.Wf.Fix_eq.
+    destruct (decode_string (length term) x cd); simpl; 
+    destruct_conjs; auto.
+    destruct ((term =? s)%string).
+    simpl in *.
+  Admitted.
+
+End String.
+
